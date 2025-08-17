@@ -1,0 +1,28 @@
+{
+  "name": "gemini-file-manager",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "lucide-react": "^0.408.0",
+    "@monaco-editor/react": "4.6.0",
+    "@google/genai": "0.12.0",
+    "idb": "8.0.0",
+    "xterm": "5.3.0",
+    "xterm-react": "1.0.0",
+    "xterm-addon-fit": "0.8.0",
+    "monaco-vim": "0.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

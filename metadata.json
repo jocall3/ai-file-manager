@@ -1,0 +1,5 @@
+{
+  "name": "Gemini File Manager",
+  "description": "A modern file manager that uses the File System Access API to browse and manage local files. It leverages the Gemini API to provide intelligent suggestions for organizing your files and folders.",
+  "requestFramePermissions": []
+}
