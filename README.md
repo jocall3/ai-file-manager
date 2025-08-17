@@ -53,10 +53,9 @@ Follow these instructions to get a local copy up and running.
 
     **.env.local**
     ```
-    VITE_GEMINI_API_KEY="YOUR_API_KEY_HERE"
+   GEMINI_API_KEY="YOUR_API_KEY_HERE"
     ```
-    > **Note:** The `VITE_` prefix is required by Vite to expose the environment variable to the client-side code.
-
+   
 4.  **Run the development server:**
     ```bash
     npm run dev
