@@ -1,9 +1,7 @@
 
 import * as fileSystemService from './fileSystemService';
 import { getFilesForDirectory } from './database';
-import { FileNode } from '../types';
-
-type PathSegment = { name: string; handle: FileSystemDirectoryHandle };
+import type { FileNode, PathSegment } from '../types';
 
 interface CommandContext {
     currentHandle: FileSystemDirectoryHandle;

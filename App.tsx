@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { ViewType } from './types';
-import type { FileNode, SortOption, OrganizationSuggestion, ModalState, StorableFileNode } from './types';
+import type { FileNode, SortOption, OrganizationSuggestion, ModalState, StorableFileNode, PathSegment } from './types';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import FileView from './components/FileView';
@@ -19,8 +19,6 @@ import EditorModal from './components/modals/EditorModal';
 import ExplainFolderModal from './components/modals/ExplainFolderModal';
 import AIActionModal from './components/modals/AIActionModal';
 import loggingService from './services/loggingService';
-
-type PathSegment = { name: string; handle: FileSystemDirectoryHandle };
 
 const isTextFile = (fileName: string) => {
     const textExtensions = ['.txt', '.md', '.json', '.js', '.ts', '.tsx', '.html', '.css', '.py', '.rb', '.java', '.c', '.cpp', '.go', '.rs'];

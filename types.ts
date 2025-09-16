@@ -18,6 +18,11 @@ export interface FileNode extends StorableFileNode {
   content?: string; // File content for the editor
 }
 
+// Represents a segment in the current navigation path.
+export type PathSegment = {
+  name: string;
+  handle: FileSystemDirectoryHandle;
+};
 
 export enum ViewType {
   GRID = 'grid',
