@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import type { FileNode } from '../types';
 import Icon, { iconMap } from './ui/Icon';
 import AIPopover from './ui/AIPopover';
-import { useAIPreview } from '../../hooks/useAIPreview';
+import { useAIPreview } from '../hooks/useAIPreview';
 
 interface FileItemProps {
   file: FileNode;

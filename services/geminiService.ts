@@ -4,16 +4,18 @@ import type { OrganizationSuggestion } from '../types';
 
 const MODEL_NAME = 'gemini-2.5-flash';
 
-// FIX: Per coding guidelines, the API key must be obtained from process.env.API_KEY. This also resolves the TypeScript error.
+// FIX: Use process.env.API_KEY as per the guidelines to resolve the error.
+// The API key is retrieved from environment variables.
 const API_KEY = process.env.API_KEY;
 
 if (!API_KEY) {
-  // FIX: Updated error message to comply with guidelines, which state not to instruct users on setting keys.
-  throw new Error("API_KEY environment variable is not set.");
+  // This error is for developers, to ensure the environment is configured.
+  throw new Error("Gemini API key is not configured.");
 }
 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
+// FIX: Aligned schema with API guidelines by removing 'required' and adding 'propertyOrdering'.
 const organizationSchema = {
   type: Type.ARRAY,
   items: {
@@ -31,7 +33,7 @@ const organizationSchema = {
         },
       },
     },
-    required: ["folderName", "fileNames"],
+    propertyOrdering: ["folderName", "fileNames"],
   },
 };
 
@@ -194,7 +196,6 @@ export async function performContextualAction(action: 'summarize' | 'explain_cod
         const response = await ai.models.generateContent({ model: MODEL_NAME, contents: prompt });
         return response.text;
     } catch (error) {
-// FIX: Added parentheses and braces to the catch block.
         console.error(`Error calling Gemini API for action '${action}':`, error);
         throw new Error(`Failed to perform AI action: ${action}.`);
     }
