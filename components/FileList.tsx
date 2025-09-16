@@ -58,16 +58,40 @@ const FileList: React.FC<FileListProps> = ({
       onFileOpen(file);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const currentSelection = sortedFiles.findIndex(f => selectedIds.has(f.id));
+        let nextIndex = currentSelection;
+
+        if (e.key === 'ArrowDown') {
+            nextIndex = currentSelection < sortedFiles.length - 1 ? currentSelection + 1 : sortedFiles.length - 1;
+        } else if (e.key === 'ArrowUp') {
+            nextIndex = currentSelection > 0 ? currentSelection - 1 : 0;
+        }
+        
+        if (nextIndex !== -1) {
+            onSelectionChange(new Set([sortedFiles[nextIndex].id]));
+        }
+    } else if (e.key === 'Enter') {
+        const selectedFile = sortedFiles.find(f => selectedIds.has(f.id));
+        if (selectedFile) {
+            onFileOpen(selectedFile);
+        }
+    }
+  };
+
+
   return (
-    <table className="w-full text-left table-fixed">
+    <table className="w-full text-left table-fixed" role="grid" onKeyDown={handleKeyDown} tabIndex={0}>
       <thead className="border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-        <tr>
-          <th className="p-2 font-semibold cursor-pointer w-3/5" onClick={() => handleSort('name')}>Name</th>
-          <th className="p-2 font-semibold cursor-pointer w-1/5" onClick={() => handleSort('size')}>Size</th>
-          <th className="p-2 font-semibold cursor-pointer w-1/5" onClick={() => handleSort('modified')}>Date Modified</th>
+        <tr role="row">
+          <th role="columnheader" className="p-2 font-semibold cursor-pointer w-3/5" onClick={() => handleSort('name')}>Name</th>
+          <th role="columnheader" className="p-2 font-semibold cursor-pointer w-1/5" onClick={() => handleSort('size')}>Size</th>
+          <th role="columnheader" className="p-2 font-semibold cursor-pointer w-1/5" onClick={() => handleSort('modified')}>Date Modified</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {sortedFiles.map(file => (
           <FileItem
             key={file.id}

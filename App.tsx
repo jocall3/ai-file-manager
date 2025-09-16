@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { ViewType } from './types';
-import type { FileNode, SortOption, OrganizationSuggestion } from './types';
+import type { FileNode, SortOption, OrganizationSuggestion, ModalState, StorableFileNode } from './types';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import FileView from './components/FileView';
@@ -12,11 +12,19 @@ import RenameModal from './components/modals/RenameModal';
 import ContextMenu, { ContextMenuItem } from './components/ui/ContextMenu';
 import Icon from './components/ui/Icon';
 import * as fileSystemService from './services/fileSystemService';
+import * as geminiService from './services/geminiService';
 import { getFilesForDirectory } from './services/database';
 import Terminal from './components/terminal/Terminal';
 import EditorModal from './components/modals/EditorModal';
+import ExplainFolderModal from './components/modals/ExplainFolderModal';
+import AIActionModal from './components/modals/AIActionModal';
 
 type PathSegment = { name: string; handle: FileSystemDirectoryHandle };
+
+const isTextFile = (fileName: string) => {
+    const textExtensions = ['.txt', '.md', '.json', '.js', '.ts', '.tsx', '.html', '.css', '.py', '.rb', '.java', '.c', '.cpp', '.go', '.rs'];
+    return textExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+};
 
 const App: React.FC = () => {
     const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
@@ -30,12 +38,15 @@ const App: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [isPickerOpen, setIsPickerOpen] = useState(false);
 
-    const [isOrganizeModalOpen, setIsOrganizeModalOpen] = useState(false);
-    const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
-    const [renameTarget, setRenameTarget] = useState<FileNode | null>(null);
-    
+    // Centralized modal state
+    const [modal, setModal] = useState<ModalState | null>(null);
+
+    // Panels
     const [isTerminalOpen, setIsTerminalOpen] = useState(false);
-    const [editingFile, setEditingFile] = useState<FileNode | null>(null);
+    
+    // Search State
+    const [searchResults, setSearchResults] = useState<FileNode[] | null>(null);
+    const [isSearching, setIsSearching] = useState(false);
 
     const mainAreaRef = useRef<HTMLElement>(null);
 
@@ -44,24 +55,24 @@ const App: React.FC = () => {
         
         setLoading(true);
         setError(null);
+        setSearchResults(null); // Clear search on navigation
         
         try {
             const newHandle = newPath[newPath.length - 1].handle;
             const directoryId = newPath.map(p => p.name).join('/');
             
-            const fileListFromDb = await getFilesForDirectory(directoryId);
+            const fileListFromDb: StorableFileNode[] = await getFilesForDirectory(directoryId);
             
-            // Augment the data from DB with live handles
             const fileListWithHandles = await Promise.all(
-                fileListFromDb.map(async (file) => {
+                fileListFromDb.map(async (storableFile) => {
                     try {
-                        const handle = file.isDirectory
-                            ? await newHandle.getDirectoryHandle(file.name)
-                            : await newHandle.getFileHandle(file.name);
-                        return { ...file, handle };
+                        const handle = storableFile.isDirectory
+                            ? await newHandle.getDirectoryHandle(storableFile.name)
+                            : await newHandle.getFileHandle(storableFile.name);
+                        return { ...storableFile, handle } as FileNode;
                     } catch (e) {
-                        console.warn(`Could not re-acquire handle for ${file.path}`, e);
-                        return null; // File might have been deleted
+                        console.warn(`Could not re-acquire handle for ${storableFile.path}`, e);
+                        return null;
                     }
                 })
             );
@@ -92,7 +103,7 @@ const App: React.FC = () => {
             if (dirHandle) {
                 setRootHandle(dirHandle);
             } else {
-                setLoading(false); // User cancelled the picker
+                setLoading(false);
             }
         } catch (e) {
             console.error("Error opening and ingesting directory:", e);
@@ -150,10 +161,10 @@ const App: React.FC = () => {
     };
 
     const handleRename = async (newName: string) => {
-      if (!renameTarget || !currentHandle || !newName) return;
+      if (!currentHandle || modal?.type !== 'rename' || !newName) return;
       try {
         const currentDirectoryPath = path.map(p => p.name).join('/');
-        await fileSystemService.renameItem(currentHandle, currentDirectoryPath, renameTarget.name, newName);
+        await fileSystemService.renameItem(currentHandle, currentDirectoryPath, modal.target.name, newName);
         refresh();
       } catch (e) {
         console.error("Failed to rename file:", e);
@@ -180,12 +191,11 @@ const App: React.FC = () => {
             const newPath = [...path, { name: file.name, handle: file.handle as FileSystemDirectoryHandle }];
             navigateTo(newPath);
         } else {
-            // Open file in editor
             const fileNode = files.find(f => f.name === file.name && !f.isDirectory);
             if (fileNode) {
                 fileSystemService.readFileContent(fileNode.handle as FileSystemFileHandle)
                     .then(content => {
-                        setEditingFile({ ...fileNode, content });
+                        setModal({ type: 'edit-file', file: { ...fileNode, content }});
                     })
                     .catch(e => {
                         console.error(`Error reading file for editor: ${e}`);
@@ -198,7 +208,7 @@ const App: React.FC = () => {
     const handleSaveFile = async (fileNode: FileNode, newContent: string) => {
         try {
             await fileSystemService.saveFileContent(fileNode.handle as FileSystemFileHandle, newContent);
-            setEditingFile(null);
+            setModal(null);
             refresh();
         } catch (e) {
             console.error("Failed to save file", e);
@@ -206,18 +216,59 @@ const App: React.FC = () => {
         }
     };
 
+    const handleSemanticSearch = async (query: string) => {
+        if (!query) {
+            setSearchResults(null);
+            return;
+        }
+        setIsSearching(true);
+        setError(null);
+        try {
+            const filesWithContent = await Promise.all(
+                files
+                    .filter(f => !f.isDirectory && isTextFile(f.name))
+                    .map(async f => ({
+                        name: f.name,
+                        content: await fileSystemService.readFileContent(f.handle as FileSystemFileHandle)
+                    }))
+            );
+            const matchingFileNames = await geminiService.performSemanticSearch(query, filesWithContent);
+            const resultSet = new Set(matchingFileNames);
+            setSearchResults(files.filter(f => resultSet.has(f.name)));
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Semantic search failed.");
+            setSearchResults([]);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
     const selectedFiles = files.filter(f => selectedIds.has(f.id));
     const canSmartOrganize = files.some(f => !f.isDirectory);
     
-    const contextMenuItems: ContextMenuItem[] = [
-        ...(selectedFiles.length > 0 ? [
-            { label: 'Rename', icon: <Icon name="rename" size={16} />, action: () => setRenameTarget(selectedFiles[0]), disabled: selectedFiles.length !== 1 },
-            { label: 'Delete', icon: <Icon name="trash" size={16} />, action: handleDelete, disabled: selectedFiles.length === 0 },
-            { isSeparator: true },
-        ] : []),
-        { label: 'New Folder', icon: <Icon name="folderPlus" size={16} />, action: () => setIsCreateFolderModalOpen(true) },
-        { label: 'Smart Organize Files', icon: <Icon name="sparkles" size={16} />, action: () => setIsOrganizeModalOpen(true), disabled: !canSmartOrganize },
-    ];
+    const getContextMenuItems = (): ContextMenuItem[] => {
+        const items: ContextMenuItem[] = [];
+
+        if (selectedFiles.length > 0) {
+            items.push({ label: 'Rename', icon: <Icon name="rename" size={16} />, action: () => setModal({ type: 'rename', target: selectedFiles[0] }), disabled: selectedFiles.length !== 1 });
+            items.push({ label: 'Delete', icon: <Icon name="trash" size={16} />, action: handleDelete, disabled: selectedFiles.length === 0 });
+        }
+
+        if (selectedFiles.length === 1) {
+            const file = selectedFiles[0];
+            if (!file.isDirectory && isTextFile(file.name)) {
+                items.push({ isSeparator: true });
+                items.push({ label: 'Summarize with AI', icon: <Icon name="summary" size={16} />, action: () => setModal({ type: 'ai-action', request: { action: 'summarize', file } }) });
+            }
+        }
+        
+        items.push({ isSeparator: true });
+        items.push({ label: 'New Folder', icon: <Icon name="folderPlus" size={16} />, action: () => setModal({ type: 'create-folder' }) });
+        items.push({ label: 'Smart Organize Files', icon: <Icon name="sparkles" size={16} />, action: () => setModal({ type: 'smart-organize' }), disabled: !canSmartOrganize });
+        
+        return items;
+    };
+
 
     if (!rootHandle) {
         return (
@@ -236,6 +287,8 @@ const App: React.FC = () => {
         );
     }
 
+    const displayedFiles = searchResults !== null ? searchResults : files;
+
     return (
         <div className="flex h-full font-sans text-sm antialiased flex-col">
             <div className="flex flex-1 overflow-hidden">
@@ -246,12 +299,17 @@ const App: React.FC = () => {
                         viewType={viewType}
                         onViewChange={setViewType}
                         onBreadcrumbNavigate={breadcrumbNavigate}
-                        onSmartOrganize={() => setIsOrganizeModalOpen(true)}
+                        onSmartOrganize={() => setModal({ type: 'smart-organize' })}
+                        onExplainFolder={() => setModal({ type: 'explain-folder' })}
                         disableSmartOrganize={!canSmartOrganize}
+                        onSearch={handleSemanticSearch}
+                        isSearching={isSearching}
+                        onClearSearch={() => setSearchResults(null)}
+                        isSearchResults={searchResults !== null}
                     />
 
                     <FileView
-                        files={files}
+                        files={displayedFiles}
                         viewType={viewType}
                         sort={sort}
                         onSortChange={setSort}
@@ -266,7 +324,7 @@ const App: React.FC = () => {
                     {selectedFiles.length > 0 && 
                         <Footer 
                             selectedFiles={selectedFiles} 
-                            onRename={() => setRenameTarget(selectedFiles[0])} 
+                            onRename={() => setModal({ type: 'rename', target: selectedFiles[0] })} 
                             onDelete={handleDelete}
                             onToggleTerminal={() => setIsTerminalOpen(!isTerminalOpen)}
                         />}
@@ -286,37 +344,56 @@ const App: React.FC = () => {
                 />
             )}
             
-            <ContextMenu items={contextMenuItems} triggerRef={mainAreaRef} />
+            <ContextMenu items={getContextMenuItems()} triggerRef={mainAreaRef} />
             
-            <SmartOrganizeModal 
-              isOpen={isOrganizeModalOpen} 
-              onClose={() => setIsOrganizeModalOpen(false)}
-              files={files.filter(f => !f.isDirectory)} 
-              onApply={handleApplyOrganization}
-            />
+            {modal?.type === 'smart-organize' &&
+              <SmartOrganizeModal 
+                isOpen={true} 
+                onClose={() => setModal(null)}
+                files={files.filter(f => !f.isDirectory)} 
+                onApply={handleApplyOrganization}
+              />
+            }
 
-            <CreateFolderModal
-                isOpen={isCreateFolderModalOpen}
-                onClose={() => setIsCreateFolderModalOpen(false)}
+            {modal?.type === 'explain-folder' &&
+              <ExplainFolderModal
+                isOpen={true}
+                onClose={() => setModal(null)}
+                files={files}
+              />
+            }
+
+            {modal?.type === 'ai-action' &&
+              <AIActionModal
+                request={modal.request}
+                onClose={() => setModal(null)}
+              />
+            }
+
+            {modal?.type === 'create-folder' &&
+              <CreateFolderModal
+                isOpen={true}
+                onClose={() => setModal(null)}
                 onSubmit={handleCreateFolder}
-            />
+              />
+            }
 
-            {renameTarget && (
-                 <RenameModal
-                    isOpen={!!renameTarget}
-                    onClose={() => setRenameTarget(null)}
-                    onSubmit={handleRename}
-                    originalName={renameTarget.name}
-                />
-            )}
+            {modal?.type === 'rename' &&
+              <RenameModal
+                isOpen={true}
+                onClose={() => setModal(null)}
+                onSubmit={handleRename}
+                originalName={modal.target.name}
+              />
+            }
             
-            {editingFile && (
-                <EditorModal
-                    file={editingFile}
-                    onClose={() => setEditingFile(null)}
-                    onSave={handleSaveFile}
-                />
-            )}
+            {modal?.type === 'edit-file' &&
+              <EditorModal
+                file={modal.file}
+                onClose={() => setModal(null)}
+                onSave={handleSaveFile}
+              />
+            }
         </div>
     );
 };

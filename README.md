@@ -1,8 +1,7 @@
-
 # Gemini File Manager
 
 ![React](https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react)
-![Vite](https://img.shields.io/badge/Vite-5-purple?style=for-the-badge&logo=vite)
+![Vite](https://img.shields.io/badge/Vite-6-purple?style=for-the-badge&logo=vite)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)
 ![Gemini API](https://img.shields.io/badge/Gemini%20API-blueviolet?style=for-the-badge&logo=google-gemini)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-3-cyan?style=for-the-badge&logo=tailwind-css)
@@ -14,13 +13,17 @@ A modern, browser-based file manager that leverages the Gemini API for intellige
 ## ✨ Key Features
 
 - **📂 Secure Local File System Access**: Uses the [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API) to read and write directly to your local files and folders. Your files stay on your machine, always.
-- **🤖 AI-Powered Organization**: Integrates the **Google Gemini API** to provide "Smart Organize" suggestions, automatically grouping related files into intelligently named folders.
-- **💻 Integrated Terminal**: A fully functional terminal powered by Xterm.js lets you run common filesystem commands like `ls`, `cd`, `mkdir`, `rm`, `mv`, and more.
-- **✍️ Built-in Code Editor**: Open and edit text files directly within the application with a powerful Monaco-based editor (the same engine as VS Code), complete with **Vim keybindings**.
+- **🤖 AI-Powered Intelligence**:
+    - **Smart Organize**: Automatically groups related files into intelligently named folders.
+    - **Semantic Search**: Search files by their *content*, not just their names.
+    - **AI Previews**: Hover over a file to see an AI-generated summary.
+    - **Explain Folder**: Get a high-level summary of any folder's purpose.
+    - **Contextual Actions**: Right-click a file to perform AI actions like "Summarize".
+- **💻 Integrated Terminal**: A fully functional terminal powered by Xterm.js lets you run common filesystem commands like `ls`, `cd`, `mkdir`, `rm`, `mv`, `cat` and more.
+- **✍️ Built-in Code Editor**: Open and edit text files directly with a powerful Monaco-based editor (the same engine as VS Code), complete with **Vim keybindings**.
 - **⚡️ Blazing Fast & Responsive UI**: Built with React 19, Vite, and Tailwind CSS for a snappy, modern user experience.
 - **💾 Persistent State with IndexedDB**: File and folder metadata is cached in IndexedDB, providing instant loads after the initial directory scan.
-- **🎨 Dual Views & Theming**: Switch between a classic list view and a visual grid view. Includes automatic light/dark mode support.
-- **🖱️ Rich Interactions**: Features include drag-to-resize terminal, context menus, multi-select, and intuitive keyboard navigation.
+- **♿ Accessible**: Full keyboard navigation and ARIA support for screen readers.
 
 ---
 
@@ -48,19 +51,21 @@ Follow these instructions to get a local copy up and running.
     ```
 
 3.  **Set up your Gemini API Key:**
-    - Create a file named `.env.local` in the root of the project.
-    - Add your Gemini API key to this file. You can use `.env.local.example` as a template.
+    - In the project's root directory, create a new file named `.env.local`.
+    - Add your Gemini API key to this file as shown below.
 
-    **.env.local**
+    `.env.local`
     ```
-   GEMINI_API_KEY="YOUR_API_KEY_HERE"
+    VITE_GEMINI_API_KEY="YOUR_API_KEY_HERE"
     ```
+   
+    **Important**: The variable name **must** start with `VITE_`. This is a security feature of the Vite build tool that allows the variable to be safely exposed to the browser. Do not change the variable name.
    
 4.  **Run the development server:**
     ```bash
     npm run dev
     ```
-    The application should now be running at `http://localhost:5173`.
+    The application should now be running. Open the URL printed in your console (usually `http://localhost:5173`).
 
 ---
 
@@ -73,7 +78,7 @@ This application is a pure client-side web app with no backend. Here's a look at
 - **Entry Point**: This service is the primary interface to the local file system.
 - **Permissions**: It handles requesting user permission to access directories via `window.showDirectoryPicker()`.
 - **Ingestion Engine**: The `ingestDirectory` function recursively scans a selected directory.
-- **Operations**: Manages all file I/O, including creating folders (`mkdir`), deleting files (`rm`), and applying the AI-powered organization structure.
+- **Optimized Operations**: Manages all file I/O, using native, atomic browser APIs for operations like moving and renaming for maximum performance and reliability.
 
 ### 2. Database Service (`services/database.ts`)
 
@@ -84,12 +89,12 @@ This application is a pure client-side web app with no backend. Here's a look at
 ### 3. Gemini Service (`services/geminiService.ts`)
 
 - **AI Brains**: This service interfaces with the Google Gemini API.
-- **Prompt Engineering**: It takes a list of file names, constructs a carefully engineered prompt, and asks the `gemini-2.5-flash` model to return organization suggestions.
+- **Prompt Engineering**: It takes file metadata, constructs carefully engineered prompts, and asks the `gemini-2.5-flash` model to return structured data for features like organization, search, and summarization.
 - **JSON Mode**: It leverages Gemini's JSON mode with a predefined schema to ensure the API returns clean, structured data that the application can immediately use.
 
 ### 4. React Components & State Management
 
-- **`App.tsx`**: The root component that orchestrates the entire application state using React hooks (`useState`, `useCallback`, `useEffect`).
+- **`App.tsx`**: The root component orchestrates the application using a centralized, type-safe state machine for modals and other global states. This robust architecture keeps the UI logic clean and predictable.
 - **Navigation Logic**: The core `navigateTo` function is the single source of truth for changing directories. It fetches metadata from the database and then dynamically re-acquires live `FileSystemHandle`s for the files in the current view. This "just-in-time" handle acquisition is key to the app's design.
 - **Modularity**: The UI is broken down into logical components for the header, sidebar, file views (grid/list), modals, and the integrated terminal and editor.
 
@@ -130,22 +135,3 @@ This project aims to be more than a file browser; it's a vision for the future o
 18. **"File Story" Timeline**: Visualize the history of a project. Select a file to see an AI-generated timeline of related documents, edits, and communications.
 19. **Multimodal Search & Interaction**: Drag an image into the search bar and type "find photos like this" or "find documents that reference this diagram."
 20. **Secure Peer-to-Peer Sharing**: Use WebRTC to generate a secure, temporary link to share a file directly from your browser to another person's, without it ever touching a central server.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! If you have a suggestion or find a bug, please open an issue to discuss it.
-
-To contribute code:
-1.  Fork the Project
-2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the Branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
-
----
-
-## 📜 License
-
-Distributed under the MIT License. See `LICENSE` for more information.

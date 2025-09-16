@@ -2,6 +2,7 @@ import React from 'react';
 import { ViewType } from '../../types';
 import Icon from '../ui/Icon';
 import Breadcrumbs from '../ui/Breadcrumbs';
+import SearchBar from '../ui/SearchBar';
 
 interface HeaderProps {
   path: { name: string; handle: FileSystemDirectoryHandle }[];
@@ -9,7 +10,12 @@ interface HeaderProps {
   onViewChange: (viewType: ViewType) => void;
   onBreadcrumbNavigate: (index: number) => void;
   onSmartOrganize: () => void;
+  onExplainFolder: () => void;
   disableSmartOrganize: boolean;
+  onSearch: (query: string) => void;
+  isSearching: boolean;
+  onClearSearch: () => void;
+  isSearchResults: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -18,13 +24,31 @@ const Header: React.FC<HeaderProps> = ({
   onViewChange,
   onBreadcrumbNavigate,
   onSmartOrganize,
-  disableSmartOrganize
+  onExplainFolder,
+  disableSmartOrganize,
+  onSearch,
+  isSearching,
+  onClearSearch,
+  isSearchResults,
 }) => {
   return (
     <header className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm sticky top-0 z-10 flex-shrink-0 h-14">
-      <Breadcrumbs path={path} onNavigate={onBreadcrumbNavigate} />
+      <div className="flex-1 min-w-0">
+        <Breadcrumbs path={path} onNavigate={onBreadcrumbNavigate} />
+      </div>
       
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2 ml-4">
+          <SearchBar onSearch={onSearch} isSearching={isSearching} onClear={onClearSearch} isResults={isSearchResults} />
+          
+          <button 
+              onClick={onExplainFolder}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900 transition-colors"
+              aria-label="Explain this Folder with AI"
+              title="Explain this Folder with AI"
+          >
+              <Icon name="brain" size={18} />
+          </button>
+
           <button 
               onClick={onSmartOrganize}
               disabled={disableSmartOrganize}
@@ -33,7 +57,6 @@ const Header: React.FC<HeaderProps> = ({
               title="Smart Organize Files"
           >
               <Icon name="sparkles" size={18} />
-              <span>Smart Organize</span>
           </button>
           <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-lg p-0.5">
             <button

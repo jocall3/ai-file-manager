@@ -4,10 +4,17 @@ import type { OrganizationSuggestion } from '../types';
 
 const MODEL_NAME = 'gemini-2.5-flash';
 
-// API key is obtained from environment variables
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+// FIX: Per coding guidelines, the API key must be obtained from process.env.API_KEY. This also resolves the TypeScript error.
+const API_KEY = process.env.API_KEY;
 
-const responseSchema = {
+if (!API_KEY) {
+  // FIX: Updated error message to comply with guidelines, which state not to instruct users on setting keys.
+  throw new Error("API_KEY environment variable is not set.");
+}
+
+const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+const organizationSchema = {
   type: Type.ARRAY,
   items: {
     type: Type.OBJECT,
@@ -56,7 +63,7 @@ export async function suggestOrganization(fileNames: string[]): Promise<Organiza
       contents: prompt,
       config: {
         responseMimeType: "application/json",
-        responseSchema: responseSchema,
+        responseSchema: organizationSchema,
       }
     });
 
@@ -68,7 +75,6 @@ export async function suggestOrganization(fileNames: string[]): Promise<Organiza
     
     const suggestions = JSON.parse(text) as OrganizationSuggestion[];
 
-    // Filter out any empty folder suggestions or suggestions that don't match the input files
     const validFileNames = new Set(fileNames);
     return suggestions
       .map(suggestion => ({
@@ -78,18 +84,118 @@ export async function suggestOrganization(fileNames: string[]): Promise<Organiza
       .filter(suggestion => suggestion.fileNames.length > 0);
 
   } catch (error) {
-    console.error("Error calling Gemini API:", error);
-    // Attempt to parse Gemini's error message if available
-    if (error instanceof Error && error.message.includes('response')) {
-      try {
-        const errorObj = JSON.parse(error.message.split('response: ')[1]);
-        if (errorObj?.error?.message) {
-           throw new Error(`Gemini API Error: ${errorObj.error.message}`);
-        }
-      } catch (e) {
-        // Fallback if parsing fails
-      }
-    }
+    console.error("Error calling Gemini API for organization:", error);
     throw new Error("Failed to get organization suggestions from Gemini.");
   }
+}
+
+export async function explainFolder(fileNames: string[]): Promise<string> {
+  if (fileNames.length === 0) {
+    return "This folder is empty.";
+  }
+  const prompt = `
+    Based on the following list of filenames from a directory, provide a high-level summary of the folder's purpose.
+    Describe the likely project type, identify any key files, and explain what the folder contains in a concise, helpful paragraph.
+    Use Markdown for formatting if it helps clarity (e.g., lists, bolding).
+
+    Filenames:
+    ${fileNames.join('\n')}
+  `;
+
+  try {
+    const response = await ai.models.generateContent({ model: MODEL_NAME, contents: prompt });
+    return response.text;
+  } catch (error) {
+    console.error("Error calling Gemini API for folder explanation:", error);
+    throw new Error("Failed to get folder explanation from Gemini.");
+  }
+}
+
+export async function generatePreview(fileName: string, fileContent: string): Promise<string> {
+    const prompt = `
+      Provide a very brief, one-sentence summary of the following file content.
+      The file is named "${fileName}". Focus on the main purpose of the file.
+      
+      Content:
+      ---
+      ${fileContent.substring(0, 4000)}
+      ---
+    `;
+    try {
+      const response = await ai.models.generateContent({ model: MODEL_NAME, contents: prompt });
+      return response.text;
+    } catch (error) {
+      console.error("Error calling Gemini API for preview:", error);
+      throw new Error("Failed to generate preview.");
+    }
+}
+
+
+export async function performSemanticSearch(query: string, files: { name: string, content: string }[]): Promise<string[]> {
+  const prompt = `
+    I am searching for: "${query}".
+    From the following list of files, please identify which ones are the most relevant to my search query.
+    Consider the file name and its content. Return your answer as a JSON array of filenames. Only return filenames that exist in the provided list.
+    
+    Example:
+    Query: "marketing report"
+    Files: [{"name": "sales.txt", "content": "Q1 sales were up."}, {"name": "report-final.txt", "content": "This is the Q2 marketing report..."}]
+    Output: ["report-final.txt"]
+
+    Files to search:
+    ${JSON.stringify(files.map(f => ({ name: f.name, content: f.content.substring(0, 2000) })))}
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        },
+      }
+    });
+
+    const text = response.text.trim();
+    return JSON.parse(text) as string[];
+  } catch (error) {
+    console.error("Error calling Gemini API for semantic search:", error);
+    throw new Error("Semantic search failed.");
+  }
+}
+
+export async function performContextualAction(action: 'summarize' | 'explain_code', fileContent: string): Promise<string> {
+    let prompt = '';
+    switch (action) {
+        case 'summarize':
+            prompt = `Please provide a detailed summary of the following document. Use markdown for formatting, including a title, key points in a bulleted list, and a concluding sentence.
+            
+            Document Content:
+            ---
+            ${fileContent}
+            ---
+            `;
+            break;
+        case 'explain_code':
+            prompt = `Please provide a detailed explanation of the following code snippet. Describe its purpose, how it works, and identify any potential improvements.
+            
+            Code:
+            ---
+            ${fileContent}
+            ---
+            `;
+            break;
+    }
+
+    try {
+        const response = await ai.models.generateContent({ model: MODEL_NAME, contents: prompt });
+        return response.text;
+    } catch (error) {
+// FIX: Added parentheses and braces to the catch block.
+        console.error(`Error calling Gemini API for action '${action}':`, error);
+        throw new Error(`Failed to perform AI action: ${action}.`);
+    }
 }

@@ -29,6 +29,8 @@ import {
   FolderOpen,
   Terminal,
   Save,
+  BrainCircuit,
+  MessageSquareQuote,
 } from 'lucide-react';
 
 export const iconMap = {
@@ -60,6 +62,8 @@ export const iconMap = {
   check: Check,
   terminal: Terminal,
   save: Save,
+  brain: BrainCircuit,
+  summary: MessageSquareQuote,
 };
 
 type IconName = keyof typeof iconMap;

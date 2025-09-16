@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { FileNode } from '../types';
 import Icon, { iconMap } from './ui/Icon';
+import AIPopover from './ui/AIPopover';
+import { useAIPreview } from '../../hooks/useAIPreview';
 
 interface FileItemProps {
   file: FileNode;
@@ -52,32 +54,35 @@ const formatDate = (timestamp: number) => {
 const FileItem: React.FC<FileItemProps> = ({ file, viewType, isSelected, onClick, onDoubleClick }) => {
   const iconName = getFileIconName(file);
   const iconColor = getFileIconColor(file);
+  const [isHovered, setIsHovered] = useState(false);
+  const { preview, isLoading } = useAIPreview(file, isHovered);
+
+  const containerProps = {
+    className: `relative cursor-pointer rounded-lg transition-colors duration-150 ${isSelected ? 'bg-blue-100 dark:bg-blue-900/50 outline-2 outline-blue-500' : 'hover:bg-gray-200/50 dark:hover:bg-gray-700/30'}`,
+    onClick: (e: React.MouseEvent) => onClick(file, e),
+    onDoubleClick: () => onDoubleClick(file),
+    onMouseEnter: () => setIsHovered(true),
+    onMouseLeave: () => setIsHovered(false),
+    'aria-selected': isSelected,
+  };
 
   if (viewType === 'list') {
     return (
-      <tr
-        className={`cursor-pointer rounded-lg transition-colors duration-150 ${isSelected ? 'bg-blue-100 dark:bg-blue-900/50' : 'hover:bg-gray-200/50 dark:hover:bg-gray-700/30'}`}
-        onClick={(e) => onClick(file, e)}
-        onDoubleClick={() => onDoubleClick(file)}
-        aria-selected={isSelected}
-      >
-        <td className="p-2 flex items-center gap-3 truncate">
+      <tr {...containerProps} role="row">
+        <td role="gridcell" className="p-2 flex items-center gap-3 truncate">
           <Icon name={iconName} className={iconColor} />
           <span className="truncate">{file.name}</span>
+          <AIPopover content={preview} isLoading={isLoading} />
         </td>
-        <td className="p-2 text-gray-600 dark:text-gray-400">{file.isDirectory ? '—' : formatBytes(file.size)}</td>
-        <td className="p-2 text-gray-600 dark:text-gray-400">{formatDate(file.modified)}</td>
+        <td role="gridcell" className="p-2 text-gray-600 dark:text-gray-400">{file.isDirectory ? '—' : formatBytes(file.size)}</td>
+        <td role="gridcell" className="p-2 text-gray-600 dark:text-gray-400">{formatDate(file.modified)}</td>
       </tr>
     );
   }
 
   return (
-    <div
-      className={`flex flex-col items-center p-2 rounded-lg cursor-pointer transition-colors duration-150 ${isSelected ? 'bg-blue-100 dark:bg-blue-900/50' : 'hover:bg-gray-200/50 dark:hover:bg-gray-700/30'}`}
-      onClick={(e) => onClick(file, e)}
-      onDoubleClick={() => onDoubleClick(file)}
-      aria-selected={isSelected}
-    >
+    <div {...containerProps} role="gridcell" className={`${containerProps.className} flex flex-col items-center p-2`}>
+       <AIPopover content={preview} isLoading={isLoading} />
       <div className="w-24 h-24 flex items-center justify-center text-5xl mb-2">
         <Icon name={iconName} className={iconColor} size={viewType === 'grid' ? 48 : 20} />
       </div>

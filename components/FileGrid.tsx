@@ -45,8 +45,42 @@ const FileGrid: React.FC<FileGridProps> = ({ files, sort, selectedIds, onSelecti
         onFileOpen(file);
     };
 
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        const numCols = window.innerWidth < 640 ? 2 : window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : window.innerWidth < 1280 ? 5 : window.innerWidth < 1536 ? 6 : 8;
+        const currentSelection = sortedFiles.findIndex(f => selectedIds.has(f.id));
+        if (currentSelection === -1) return;
+
+        let nextIndex = currentSelection;
+        switch (e.key) {
+            case 'ArrowRight':
+                nextIndex = Math.min(currentSelection + 1, sortedFiles.length - 1);
+                break;
+            case 'ArrowLeft':
+                nextIndex = Math.max(currentSelection - 1, 0);
+                break;
+            case 'ArrowDown':
+                nextIndex = Math.min(currentSelection + numCols, sortedFiles.length - 1);
+                break;
+            case 'ArrowUp':
+                nextIndex = Math.max(currentSelection - numCols, 0);
+                break;
+            case 'Enter':
+                onFileOpen(sortedFiles[currentSelection]);
+                return;
+            default:
+                return;
+        }
+        e.preventDefault();
+        onSelectionChange(new Set([sortedFiles[nextIndex].id]));
+    };
+
     return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+        <div 
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4" 
+            role="grid"
+            onKeyDown={handleKeyDown}
+            tabIndex={0}
+        >
             {sortedFiles.map(file => (
                 <FileItem
                     key={file.id}

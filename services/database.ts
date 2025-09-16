@@ -1,6 +1,6 @@
 
 import { openDB, IDBPDatabase } from 'idb';
-import type { FileNode } from '../types';
+import type { FileNode, StorableFileNode } from '../types';
 
 const DB_NAME = 'GeminiFileManagerDB';
 const DB_VERSION = 1;
@@ -29,12 +29,12 @@ const initDB = () => {
 export async function addFile(fileNode: FileNode) {
   const db = await initDB();
   // We need to store a serializable version of the FileNode, so we omit the handle
-  const { handle, ...storableFileNode } = fileNode;
+  const { handle, content, ...storableFileNode } = fileNode;
   await db.put(FILE_STORE_NAME, storableFileNode);
 }
 
 
-export async function getFilesForDirectory(parentId: string | null): Promise<FileNode[]> {
+export async function getFilesForDirectory(parentId: string | null): Promise<StorableFileNode[]> {
   const db = await initDB();
   const tx = db.transaction(FILE_STORE_NAME, 'readonly');
   const index = tx.store.index('parentId');
@@ -53,7 +53,7 @@ export async function deleteFileNode(path: string) {
   await db.delete(FILE_STORE_NAME, path);
 }
 
-export async function getDescendants(path: string): Promise<FileNode[]> {
+export async function getDescendants(path: string): Promise<StorableFileNode[]> {
     const db = await initDB();
     const allFiles = await db.getAll(FILE_STORE_NAME);
     // Find all files that are children of the given path
@@ -79,7 +79,7 @@ export async function updatePath(oldPath: string, newPath: string) {
     const tx = db.transaction(FILE_STORE_NAME, 'readwrite');
     const store = tx.objectStore(FILE_STORE_NAME);
 
-    const originalNode = await store.get(oldPath);
+    const originalNode: StorableFileNode | undefined = await store.get(oldPath);
     if (!originalNode) {
         console.error(`Node not found in DB for path: ${oldPath}`);
         await tx.done;
@@ -94,7 +94,7 @@ export async function updatePath(oldPath: string, newPath: string) {
     // Prepare all nodes that need to be added
     const newParentPath = newPath.substring(0, newPath.lastIndexOf('/'));
     
-    const updatedOriginalNode = {
+    const updatedOriginalNode: StorableFileNode = {
         ...originalNode,
         path: newPath,
         name: newPath.substring(newPath.lastIndexOf('/') + 1),

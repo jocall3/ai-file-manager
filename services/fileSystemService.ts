@@ -120,15 +120,9 @@ export async function renameItem(parentHandle: FileSystemDirectoryHandle, parent
     const allowed = await verifyPermission(parentHandle, true);
     if (!allowed) throw new Error('Permission denied to rename.');
 
-    let handle: FileSystemHandle;
-    try {
-        handle = await parentHandle.getFileHandle(oldName);
-    } catch (e) {
-        handle = await parentHandle.getDirectoryHandle(oldName);
-    }
-
-    // The 'move' method on a handle, when given one argument, renames it in place.
-    await (handle as any).move(newName);
+    // The 'move' method on a directory handle renames a child entry.
+    // FIX: Cast parentHandle to 'any' to use the 'move' method, which may not be in default TS types.
+    await (parentHandle as any).move(oldName, newName);
 
     // Update database transactionally
     const oldPath = `${parentPath}/${oldName}`;
@@ -155,22 +149,6 @@ export async function deleteFiles(directoryHandle: FileSystemDirectoryHandle, fi
     }
 }
 
-async function _recursiveMove(sourceHandle: FileSystemHandle, destParentHandle: FileSystemDirectoryHandle) {
-    if (sourceHandle.kind === 'file') {
-        const file = await (sourceHandle as FileSystemFileHandle).getFile();
-        const newFileHandle = await destParentHandle.getFileHandle(sourceHandle.name, { create: true });
-        const writable = await newFileHandle.createWritable();
-        await writable.write(file);
-        await writable.close();
-    } else if (sourceHandle.kind === 'directory') {
-        const newDirHandle = await destParentHandle.getDirectoryHandle(sourceHandle.name, { create: true });
-        for await (const entry of (sourceHandle as FileSystemDirectoryHandle).values()) {
-            await _recursiveMove(entry, newDirHandle);
-        }
-    }
-}
-
-
 export async function moveItems(sourceParentHandle: FileSystemDirectoryHandle, sourceParentPath: string, itemNames: string[], destHandle: FileSystemDirectoryHandle, destPath: string): Promise<void> {
     const allowedSource = await verifyPermission(sourceParentHandle, true);
     const allowedDest = await verifyPermission(destHandle, true);
@@ -180,24 +158,14 @@ export async function moveItems(sourceParentHandle: FileSystemDirectoryHandle, s
         const oldPath = `${sourceParentPath}/${itemName}`;
         const newPath = `${destPath}/${itemName}`;
         
-        let handle: FileSystemHandle;
-        try {
-            handle = await sourceParentHandle.getFileHandle(itemName);
-        } catch(e) {
-            handle = await sourceParentHandle.getDirectoryHandle(itemName);
-        }
+        // 1. Use the native move method on the source directory handle.
+        // FIX: Cast sourceParentHandle to 'any' to use the 'move' method, which may not be in default TS types.
+        await (sourceParentHandle as any).move(itemName, destHandle);
 
-        // 1. Perform recursive copy
-        await _recursiveMove(handle, destHandle);
-        
-        // 2. Remove original
-        await sourceParentHandle.removeEntry(itemName, { recursive: true });
-
-        // 3. Update database
+        // 2. Update database transactionally
         await updatePath(oldPath, newPath);
     }
 }
-
 
 export async function applyOrganization(directoryHandle: FileSystemDirectoryHandle, suggestions: OrganizationSuggestion[], currentDirectoryPath: string): Promise<void> {
     const allowed = await verifyPermission(directoryHandle, true);
@@ -223,7 +191,7 @@ export async function applyOrganization(directoryHandle: FileSystemDirectoryHand
                 modified: Date.now(),
             });
 
-            // Move the files into the new folder
+            // Move the files into the new folder using the new, efficient moveItems function
             await moveItems(directoryHandle, currentDirectoryPath, fileNames, folderHandle, newFolderPath);
 
         } catch (e) {

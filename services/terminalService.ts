@@ -1,5 +1,7 @@
 
 import * as fileSystemService from './fileSystemService';
+import { getFilesForDirectory } from './database';
+import { FileNode } from '../types';
 
 type PathSegment = { name: string; handle: FileSystemDirectoryHandle };
 
@@ -30,6 +32,8 @@ export async function executeCommand(commandString: string, context: CommandCont
                 return await createFile(args[0], context);
             case 'rm':
                 return await removeFile(args, context);
+            case 'cat':
+                return await catFile(args[0], context);
             case 'vim':
                 return await openVim(args[0], context);
             case 'mv':
@@ -37,7 +41,7 @@ export async function executeCommand(commandString: string, context: CommandCont
             case 'clear':
                 return 'clear';
             case 'help':
-                return 'Available commands: ls, pwd, cd, mkdir, touch, rm, vim, mv, clear, help';
+                return 'Available commands: ls, pwd, cd, mkdir, touch, rm, cat, vim, mv, clear, help';
             default:
                 return `command not found: ${command}`;
         }
@@ -97,18 +101,42 @@ async function createFile(name: string, context: CommandContext): Promise<string
 
 async function removeFile(names: string[], context: CommandContext): Promise<string> {
     if (names.length === 0) return 'Usage: rm <file_or_directory_name>';
-    // This is a simplified version. A real rm would need to get FileNode objects to pass to deleteFiles.
-    // For now, we use the direct handle method which doesn't update the DB correctly.
-    // A proper implementation would query the DB for the FileNodes first.
-    for (const name of names) {
-        try {
-            await context.currentHandle.removeEntry(name, { recursive: true });
-        } catch (e) {
-            return `rm: cannot remove '${name}': No such file or directory`;
-        }
+    
+    const parentId = context.path.map(p => p.name).join('/');
+    const filesInDir = await getFilesForDirectory(parentId);
+    
+    const storableFilesToDelete = filesInDir.filter(f => names.includes(f.name));
+
+    if(storableFilesToDelete.length === 0) {
+        return `rm: cannot remove '${names[0]}': No such file or directory`;
     }
+
+    try {
+        const filesToDeleteWithHandles: FileNode[] = await Promise.all(
+            storableFilesToDelete.map(async (storableFile) => {
+                const handle = storableFile.isDirectory
+                    ? await context.currentHandle.getDirectoryHandle(storableFile.name)
+                    : await context.currentHandle.getFileHandle(storableFile.name);
+                return { ...storableFile, handle };
+            })
+        );
+        await fileSystemService.deleteFiles(context.currentHandle, filesToDeleteWithHandles);
+    } catch (e) {
+         return e instanceof Error ? e.message : 'Error removing file(s).';
+    }
+
     context.refresh();
     return '';
+}
+
+async function catFile(fileName: string, context: CommandContext): Promise<string> {
+    if (!fileName) return 'Usage: cat <filename>';
+    try {
+        const fileHandle = await context.currentHandle.getFileHandle(fileName, { create: false });
+        return await fileSystemService.readFileContent(fileHandle);
+    } catch(e) {
+        return `cat: ${fileName}: No such file or directory`;
+    }
 }
 
 async function openVim(fileName: string, context: CommandContext): Promise<string> {
