@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -5,6 +6,7 @@ import type { AIActionRequest } from '../../types';
 import { readFileContent } from '../../services/fileSystemService';
 import { performContextualAction } from '../../services/geminiService';
 import Icon from '../ui/Icon';
+import loggingService from '../../services/loggingService';
 
 interface AIActionModalProps {
   request: AIActionRequest;
@@ -39,8 +41,9 @@ const AIActionModal: React.FC<AIActionModalProps> = ({ request, onClose }) => {
       const aiResult = await performContextualAction(request.action, content);
       setResult(aiResult);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'An unknown error occurred.');
-      console.error(e);
+      const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+      setError(errorMessage);
+      loggingService.error('AIActionModal', `Failed to perform action '${request.action}' on ${request.file.name}: ${errorMessage}`, e);
     } finally {
       setIsLoading(false);
     }

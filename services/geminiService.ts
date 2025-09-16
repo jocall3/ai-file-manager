@@ -1,21 +1,29 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import type { OrganizationSuggestion } from '../types';
+import loggingService from './loggingService';
 
 const MODEL_NAME = 'gemini-2.5-flash';
 
-// FIX: Use process.env.API_KEY as per the guidelines to resolve the error.
-// The API key is retrieved from environment variables.
-const API_KEY = process.env.API_KEY;
+let ai: GoogleGenAI | null = null;
 
-if (!API_KEY) {
-  // This error is for developers, to ensure the environment is configured.
-  throw new Error("Gemini API key is not configured.");
+// Lazily initialize the AI client to prevent app crash on startup if API key is missing.
+function getAiClient(): GoogleGenAI {
+  if (ai) {
+    return ai;
+  }
+
+  const API_KEY = process.env.API_KEY;
+  if (!API_KEY) {
+    // This user-friendly error will be caught by the UI components that call the API
+    throw new Error("Gemini API key is not configured. Please see the README.md for setup instructions.");
+  }
+  
+  ai = new GoogleGenAI({ apiKey: API_KEY });
+  loggingService.log('GeminiService', 'GoogleGenAI client initialized successfully.');
+  return ai;
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY });
-
-// FIX: Aligned schema with API guidelines by removing 'required' and adding 'propertyOrdering'.
 const organizationSchema = {
   type: Type.ARRAY,
   items: {
@@ -60,7 +68,8 @@ export async function suggestOrganization(fileNames: string[]): Promise<Organiza
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const aiClient = getAiClient();
+    const response = await aiClient.models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -71,7 +80,7 @@ export async function suggestOrganization(fileNames: string[]): Promise<Organiza
 
     const text = response.text.trim();
     if (!text) {
-        console.warn("Received empty response from Gemini API");
+        loggingService.warn("GeminiService", "Received empty response from Gemini API for organization suggestions.");
         return [];
     }
     
@@ -86,7 +95,7 @@ export async function suggestOrganization(fileNames: string[]): Promise<Organiza
       .filter(suggestion => suggestion.fileNames.length > 0);
 
   } catch (error) {
-    console.error("Error calling Gemini API for organization:", error);
+    loggingService.error('GeminiService', 'Error calling Gemini API for organization suggestions:', error);
     throw new Error("Failed to get organization suggestions from Gemini.");
   }
 }
@@ -105,10 +114,11 @@ export async function explainFolder(fileNames: string[]): Promise<string> {
   `;
 
   try {
-    const response = await ai.models.generateContent({ model: MODEL_NAME, contents: prompt });
+    const aiClient = getAiClient();
+    const response = await aiClient.models.generateContent({ model: MODEL_NAME, contents: prompt });
     return response.text;
   } catch (error) {
-    console.error("Error calling Gemini API for folder explanation:", error);
+    loggingService.error('GeminiService', 'Error calling Gemini API for folder explanation:', error);
     throw new Error("Failed to get folder explanation from Gemini.");
   }
 }
@@ -124,10 +134,11 @@ export async function generatePreview(fileName: string, fileContent: string): Pr
       ---
     `;
     try {
-      const response = await ai.models.generateContent({ model: MODEL_NAME, contents: prompt });
+      const aiClient = getAiClient();
+      const response = await aiClient.models.generateContent({ model: MODEL_NAME, contents: prompt });
       return response.text;
     } catch (error) {
-      console.error("Error calling Gemini API for preview:", error);
+      loggingService.error('GeminiService', `Error calling Gemini API for preview of "${fileName}":`, error);
       throw new Error("Failed to generate preview.");
     }
 }
@@ -149,7 +160,8 @@ export async function performSemanticSearch(query: string, files: { name: string
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const aiClient = getAiClient();
+    const response = await aiClient.models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -164,7 +176,7 @@ export async function performSemanticSearch(query: string, files: { name: string
     const text = response.text.trim();
     return JSON.parse(text) as string[];
   } catch (error) {
-    console.error("Error calling Gemini API for semantic search:", error);
+    loggingService.error('GeminiService', 'Error calling Gemini API for semantic search:', error);
     throw new Error("Semantic search failed.");
   }
 }
@@ -193,10 +205,11 @@ export async function performContextualAction(action: 'summarize' | 'explain_cod
     }
 
     try {
-        const response = await ai.models.generateContent({ model: MODEL_NAME, contents: prompt });
+        const aiClient = getAiClient();
+        const response = await aiClient.models.generateContent({ model: MODEL_NAME, contents: prompt });
         return response.text;
     } catch (error) {
-        console.error(`Error calling Gemini API for action '${action}':`, error);
+        loggingService.error('GeminiService', `Error calling Gemini API for action '${action}':`, error);
         throw new Error(`Failed to perform AI action: ${action}.`);
     }
 }

@@ -1,7 +1,9 @@
+
 import { useState, useEffect } from 'react';
 import type { FileNode } from '../types';
 import { generatePreview } from '../services/geminiService';
 import { readFileContent } from '../services/fileSystemService';
+import loggingService from '../services/loggingService';
 
 const isPreviewableFile = (fileName: string) => {
     const textExtensions = ['.txt', '.md', '.json', '.js', '.ts', '.tsx', '.html', '.css', '.py'];
@@ -37,7 +39,9 @@ export const useAIPreview = (file: FileNode, isHovered: boolean) => {
                 setPreview(summary);
             } catch (e) {
                  if (isCancelled) return;
-                setError(e instanceof Error ? e.message : 'Failed to get preview');
+                const errorMessage = e instanceof Error ? e.message : 'Failed to get preview';
+                setError(errorMessage);
+                loggingService.error('useAIPreview', `Failed to fetch preview for ${file.name}: ${errorMessage}`, e);
             } finally {
                  if (!isCancelled) setIsLoading(false);
             }

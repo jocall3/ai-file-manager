@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { explainFolder } from '../../services/geminiService';
 import type { FileNode } from '../../types';
 import Icon from '../ui/Icon';
+import loggingService from '../../services/loggingService';
 
 interface ExplainFolderModalProps {
   isOpen: boolean;
@@ -31,8 +33,9 @@ const ExplainFolderModal: React.FC<ExplainFolderModalProps> = ({ isOpen, onClose
       const result = await explainFolder(fileNames);
       setExplanation(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'An unknown error occurred.');
-      console.error(e);
+      const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+      setError(errorMessage);
+      loggingService.error('ExplainFolderModal', `Failed to fetch folder explanation: ${errorMessage}`, e);
     } finally {
       setIsLoading(false);
     }

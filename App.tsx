@@ -18,6 +18,7 @@ import Terminal from './components/terminal/Terminal';
 import EditorModal from './components/modals/EditorModal';
 import ExplainFolderModal from './components/modals/ExplainFolderModal';
 import AIActionModal from './components/modals/AIActionModal';
+import loggingService from './services/loggingService';
 
 type PathSegment = { name: string; handle: FileSystemDirectoryHandle };
 
@@ -71,7 +72,7 @@ const App: React.FC = () => {
                             : await newHandle.getFileHandle(storableFile.name);
                         return { ...storableFile, handle } as FileNode;
                     } catch (e) {
-                        console.warn(`Could not re-acquire handle for ${storableFile.path}`, e);
+                        loggingService.warn('App', `Could not re-acquire handle for ${storableFile.path}`, e);
                         return null;
                     }
                 })
@@ -84,8 +85,9 @@ const App: React.FC = () => {
             setCurrentHandle(newHandle);
             setSelectedIds(new Set());
         } catch (e) {
-            console.error("Failed to navigate and load files:", e);
-            setError(e instanceof Error ? e.message : "Could not read directory contents.");
+            const errorMessage = e instanceof Error ? e.message : "Could not read directory contents.";
+            loggingService.error('App', 'Failed to navigate and load files:', e);
+            setError(errorMessage);
             setFiles([]);
         } finally {
             setLoading(false);
@@ -106,7 +108,7 @@ const App: React.FC = () => {
                 setLoading(false);
             }
         } catch (e) {
-            console.error("Error opening and ingesting directory:", e);
+            loggingService.error('App', 'Error opening and ingesting directory:', e);
             setError("Failed to process directory. Please try again.");
             setLoading(false);
         } finally {
@@ -141,8 +143,9 @@ const App: React.FC = () => {
         await fileSystemService.applyOrganization(currentHandle, suggestions, currentDirectoryPath);
         refresh();
       } catch (e) {
-        console.error("Failed to apply organization", e);
-        setError(e instanceof Error ? e.message : "An error occurred while organizing files.");
+        const errorMessage = e instanceof Error ? e.message : "An error occurred while organizing files.";
+        loggingService.error('App', 'Failed to apply organization', e);
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -155,8 +158,9 @@ const App: React.FC = () => {
             await fileSystemService.createDirectory(currentHandle, folderName, directoryId);
             refresh();
         } catch (e) {
-            console.error("Failed to create folder", e);
-            setError(e instanceof Error ? e.message : "Could not create folder.");
+            const errorMessage = e instanceof Error ? e.message : "Could not create folder.";
+            loggingService.error('App', 'Failed to create folder', e);
+            setError(errorMessage);
         }
     };
 
@@ -167,8 +171,9 @@ const App: React.FC = () => {
         await fileSystemService.renameItem(currentHandle, currentDirectoryPath, modal.target.name, newName);
         refresh();
       } catch (e) {
-        console.error("Failed to rename file:", e);
-        setError(e instanceof Error ? e.message : "Could not rename.");
+        const errorMessage = e instanceof Error ? e.message : "Could not rename.";
+        loggingService.error('App', 'Failed to rename file:', e);
+        setError(errorMessage);
       }
     }
 
@@ -180,8 +185,9 @@ const App: React.FC = () => {
                 await fileSystemService.deleteFiles(currentHandle, selectedFiles);
                 refresh();
             } catch (e) {
-                console.error("Failed to delete files:", e);
-                setError(e instanceof Error ? e.message : "Could not delete items.");
+                const errorMessage = e instanceof Error ? e.message : "Could not delete items.";
+                loggingService.error('App', 'Failed to delete files:', e);
+                setError(errorMessage);
             }
         }
     };
@@ -198,8 +204,9 @@ const App: React.FC = () => {
                         setModal({ type: 'edit-file', file: { ...fileNode, content }});
                     })
                     .catch(e => {
-                        console.error(`Error reading file for editor: ${e}`);
-                        setError(e instanceof Error ? e.message : "Could not open file in editor.");
+                        const errorMessage = e instanceof Error ? e.message : "Could not open file in editor.";
+                        loggingService.error('App', `Error reading file for editor: ${file.name}`, e);
+                        setError(errorMessage);
                     });
             }
         }
@@ -211,8 +218,9 @@ const App: React.FC = () => {
             setModal(null);
             refresh();
         } catch (e) {
-            console.error("Failed to save file", e);
-            setError(e instanceof Error ? e.message : "Could not save file.");
+            const errorMessage = e instanceof Error ? e.message : "Could not save file.";
+            loggingService.error('App', `Failed to save file: ${fileNode.name}`, e);
+            setError(errorMessage);
         }
     };
 
@@ -236,7 +244,9 @@ const App: React.FC = () => {
             const resultSet = new Set(matchingFileNames);
             setSearchResults(files.filter(f => resultSet.has(f.name)));
         } catch (e) {
-            setError(e instanceof Error ? e.message : "Semantic search failed.");
+            const errorMessage = e instanceof Error ? e.message : "Semantic search failed.";
+            loggingService.error('App', 'Semantic search failed:', e);
+            setError(errorMessage);
             setSearchResults([]);
         } finally {
             setIsSearching(false);

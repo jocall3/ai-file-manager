@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { suggestOrganization } from '../../services/geminiService';
 import type { FileNode, OrganizationSuggestion } from '../../types';
 import Icon from '../ui/Icon';
+import loggingService from '../../services/loggingService';
 
 interface SmartOrganizeModalProps {
   isOpen: boolean;
@@ -28,8 +29,9 @@ const SmartOrganizeModal: React.FC<SmartOrganizeModalProps> = ({ isOpen, onClose
       const result = await suggestOrganization(fileNames);
       setSuggestions(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'An unknown error occurred.');
-      console.error(e);
+      const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+      setError(errorMessage);
+      loggingService.error('SmartOrganizeModal', `Failed to fetch suggestions: ${errorMessage}`, e);
     } finally {
       setIsLoading(false);
     }

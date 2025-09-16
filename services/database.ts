@@ -1,6 +1,7 @@
 
 import { openDB, IDBPDatabase } from 'idb';
 import type { FileNode, StorableFileNode } from '../types';
+import loggingService from './loggingService';
 
 const DB_NAME = 'GeminiFileManagerDB';
 const DB_VERSION = 1;
@@ -81,7 +82,7 @@ export async function updatePath(oldPath: string, newPath: string) {
 
     const originalNode: StorableFileNode | undefined = await store.get(oldPath);
     if (!originalNode) {
-        console.error(`Node not found in DB for path: ${oldPath}`);
+        loggingService.error('DatabaseService', `Node not found in DB for path: ${oldPath}`);
         await tx.done;
         return;
     }

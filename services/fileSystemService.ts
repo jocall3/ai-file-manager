@@ -1,6 +1,7 @@
 
 import type { FileNode, OrganizationSuggestion } from '../types';
 import { addFile, clearAllFiles, deleteFileNode, deleteDescendants, updatePath } from './database';
+import loggingService from './loggingService';
 
 async function verifyPermission(fileHandle: FileSystemHandle, readWrite = false): Promise<boolean> {
   const options: { mode?: 'read' | 'readwrite' } = {};
@@ -18,6 +19,9 @@ async function verifyPermission(fileHandle: FileSystemHandle, readWrite = false)
 }
 
 export async function openDirectoryAndIngest(): Promise<FileSystemDirectoryHandle | null> {
+  if (!(window as any).showDirectoryPicker) {
+    throw new Error('Your browser does not support the File System Access API. Please use a modern browser like Chrome or Edge.');
+  }
   try {
     const directoryHandle = await (window as any).showDirectoryPicker();
     if (directoryHandle) {
@@ -26,9 +30,10 @@ export async function openDirectoryAndIngest(): Promise<FileSystemDirectoryHandl
     return directoryHandle;
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') {
+      loggingService.log('FileSystemService', 'User aborted directory picker.');
       return null;
     }
-    console.error('Error opening directory picker:', e);
+    loggingService.error('FileSystemService', 'Error opening directory picker:', e);
     throw e;
   }
 }
@@ -46,6 +51,7 @@ export async function ingestDirectory(directoryHandle: FileSystemDirectoryHandle
 
     if (parentPath === null) {
       await clearAllFiles(); // Clear previous data when opening a new root
+      loggingService.log('FileSystemService', 'Cleared all previous file data from DB.');
     }
 
     const currentDirPath = parentPath ? `${parentPath}/${directoryHandle.name}` : directoryHandle.name;
@@ -83,7 +89,7 @@ export async function ingestDirectory(directoryHandle: FileSystemDirectoryHandle
                     cid: cid,
                 });
             } catch (e) {
-                console.warn(`Could not process file ${handle.name}:`, e);
+                loggingService.warn('FileSystemService', `Could not process file ${handle.name}:`, e);
             }
         }
     }
@@ -195,7 +201,7 @@ export async function applyOrganization(directoryHandle: FileSystemDirectoryHand
             await moveItems(directoryHandle, currentDirectoryPath, fileNames, folderHandle, newFolderPath);
 
         } catch (e) {
-            console.error(`Error processing folder "${folderName}":`, e);
+            loggingService.error('FileSystemService', `Error processing folder "${folderName}":`, e);
             throw new Error(`Failed to organize files into "${folderName}".`);
         }
     }
