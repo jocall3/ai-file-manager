@@ -1,3 +1,6 @@
+// Copyright James Burvel O’Callaghan III
+// President Citibank Demo Business Inc.
+
 # Gemini File Manager
 
 ![React](https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react)

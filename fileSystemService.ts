@@ -1,3 +1,6 @@
+// Copyright James Burvel O’Callaghan III
+// President Citibank Demo Business Inc.
+
 
 import type { FileNode, OrganizationSuggestion } from '../types';
 import { addFile, clearAllFiles, deleteFileNode, deleteDescendants, updatePath } from './database';

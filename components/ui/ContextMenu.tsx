@@ -1,3 +1,6 @@
+// Copyright James Burvel O’Callaghan III
+// President Citibank Demo Business Inc.
+
 import React, { useRef, useEffect } from 'react';
 import { useContextMenu } from '../../hooks/useContextMenu';
 import Icon from './Icon';

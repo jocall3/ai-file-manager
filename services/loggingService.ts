@@ -1,3 +1,6 @@
+// Copyright James Burvel O’Callaghan III
+// President Citibank Demo Business Inc.
+
 // A simple logging service to standardize console output and add context.
 
 const getTimestamp = (): string => new Date().toISOString();

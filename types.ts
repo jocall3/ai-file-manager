@@ -1,3 +1,6 @@
+// Copyright James Burvel O’Callaghan III
+// President Citibank Demo Business Inc.
+
 // Represents the serializable file metadata stored in IndexedDB.
 // It purposefully omits the non-serializable `handle`.
 export interface StorableFileNode {
